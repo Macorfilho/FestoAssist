@@ -7,8 +7,6 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from pathlib import Path
 from langchain_community.document_loaders import PyMuPDFLoader, UnstructuredMarkdownLoader
 import dotenv
-import nltk
-nltk.download('punkt')
 
 
 # Carrega as variáveis de ambiente (necessário para a GOOGLE_API_KEY)
