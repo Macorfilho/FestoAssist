@@ -1,0 +1,28 @@
+# Ignorar diretórios de ambiente virtual
+venv/
+.venv/
+
+# Ignorar diretórios do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignorar diretórios do Git
+.git/
+.gitignore
+
+# Ignorar arquivos de configuração de IDE
+.idea/
+.vscode/
+
+# Ignorar arquivos de ambiente
+.env
+
+# Ignorar diretórios de build e cache
+build/
+dist/
+*.egg-info/
+.cache/
+.pytest_cache/
+.mypy_cache/

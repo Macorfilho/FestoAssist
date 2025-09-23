@@ -2,29 +2,38 @@
 
 ## Visão Geral
 
-O **FestoTech Assistant**, apelidado de **"NewSon"**, é um assistente de IA especialista na Estação de Manipulação Pneumática da Festo, projetado para atuar como o cérebro de um sistema de **Digital Twin**. Em ambientes industriais, tempo é dinheiro. Quando um operador precisa de uma informação crítica, ele não pode perder tempo folheando manuais. O NewSon resolve esse problema, fornecendo respostas rápidas e precisas, baseadas em documentos técnicos, para garantir a eficiência e a segurança da operação.
+O **FestoTech Assistant**, apelidado de **"NewSon"**, é um assistente de IA especialista na Estação de Manipulação Pneumática da Festo, projetado para atuar como o cérebro de um sistema de **Digital Twin**. Ele fornece respostas técnicas rápidas e precisas, baseadas em documentos, para operadores e técnicos de manutenção.
 
 Utilizando uma arquitetura de **Geração Aumentada por Recuperação (RAG)**, o assistente garante que cada resposta seja extraída diretamente de uma base de conhecimento confiável (documentos PDF da Festo), eliminando o risco de informações incorretas ou "alucinações" da IA.
 
-## Arquitetura
+## Arquitetura de Software (SOLID)
 
-A aplicação é construída como uma API RESTful, combinando tecnologias de ponta para oferecer uma solução robusta e especializada.
+A aplicação foi refatorada para seguir os princípios **SOLID**, resultando em um design desacoplado, modular e de fácil manutenção. A inicialização ocorre no `app.py` através do padrão **Application Factory**, que compõe a aplicação injetando as dependências necessárias.
 
--   **API Backend:** **Flask** serve como a espinha dorsal da aplicação, expondo endpoints como `/chat`.
--   **Orquestração de IA:** **LangChain** é o cérebro da operação. Ele gerencia o fluxo de dados e integra os componentes. Uma característica chave é o **prompt de sistema**, que define a persona "NewSon" e injeta um **contexto fixo** sobre a composição do hardware da estação (atuadores, válvulas, sensores), garantindo que o assistente sempre conheça o sistema que monitora.
--   **Modelo de Linguagem (LLM):** **Google Gemini (`gemini-2.5-pro`)** é o motor de geração de linguagem, responsável por compreender as perguntas e formular respostas coesas, seguindo as regras estritas de sua persona. O `embedding-001` é usado para a vetorização dos documentos.
--   **Banco de Dados Vetorial:** **FAISS** armazena os embeddings dos documentos técnicos, permitindo buscas de similaridade semântica em alta velocidade para encontrar o contexto relevante para a pergunta do usuário.
--   **Memória da Conversa:** **Redis** atua como uma memória de curto prazo, armazenando o histórico de cada sessão de chat para manter o contexto em conversas contínuas.
+-   **`app.py` (Camada de Composição e API)**
+    -   Utiliza **Flask** para expor uma API RESTful (`/chat`, `/health`).
+    -   Atua como o "contêiner de injeção de dependência": instancia todos os componentes (provedores, serviços) e os conecta na inicialização.
+
+-   **`config.py` (Camada de Configuração)**
+    -   `ConfigManager`: Centraliza o carregamento e o acesso a todas as configurações e variáveis de ambiente (`GOOGLE_API_KEY`, `REDIS_URL`), garantindo que a gestão de configurações seja isolada.
+
+-   **`providers.py` (Camada de Provedores de Recursos)**
+    -   `ModelProvider`: Responsável por inicializar e fornecer instâncias dos modelos de linguagem (LLM e Embeddings) do Google Gemini.
+    -   `VectorStoreProvider`: Gerencia o carregamento do banco de dados vetorial **FAISS** e fornece o `retriever` para busca de documentos.
+    -   `ChatHistoryProvider`: Gerencia a conexão com o **Redis** e fornece o mecanismo de histórico de conversas.
+
+-   **`agent_manager.py` (Camada de Serviço/Lógica de Negócio)**
+    -   `AgentService`: Orquestra a lógica de negócio principal. Recebe suas dependências (LLM, retriever, provedor de histórico) via injeção de dependência. Sua única responsabilidade é construir e executar a cadeia RAG conversacional usando **LangChain**.
 
 ## Fluxo de Execução
 
-1.  **Recebimento da Pergunta:** O usuário envia uma pergunta para o endpoint `/chat` via API.
-2.  **Recuperação do Histórico:** O LangChain recupera o histórico da conversa associado à sessão do Redis.
-3.  **Busca na Base Vetorial:** A pergunta é usada para consultar o índice FAISS, que retorna os trechos de documentos mais relevantes.
-4.  **Geração Aumentada:** Os trechos recuperados, o histórico da conversa e a pergunta original são combinados em um *prompt* otimizado. Este prompt inclui a **persona "NewSon"** e o **contexto fixo do sistema**, garantindo que a resposta seja técnica e contextualizada.
-5.  **Geração da Resposta:** O *prompt* é enviado ao Google Gemini, que gera uma resposta seguindo as regras definidas (foco técnico, sem especulação, etc.).
-6.  **Atualização do Histórico:** A nova interação é salva no Redis.
-7.  **Retorno ao Usuário:** A resposta final é enviada de volta ao usuário em formato JSON.
+1.  **Inicialização (`app.py`)**: A aplicação é iniciada, e a função `create_app` instancia o `ConfigManager`, os `Providers` e, finalmente, o `AgentService`, injetando todas as dependências.
+2.  **Requisição de Chat**: Um usuário envia uma pergunta para o endpoint `/chat`.
+3.  **Execução da Cadeia (`AgentService`)**: O `AgentService` utiliza as dependências injetadas para executar a cadeia RAG:
+    a.  O `ChatHistoryProvider` recupera o histórico da conversa do Redis.
+    b.  O `VectorStoreProvider` (via `retriever`) busca os documentos relevantes no FAISS.
+    c.  O `ModelProvider` (via `llm`) gera uma resposta com base na pergunta, no histórico e nos documentos recuperados.
+4.  **Resposta da API**: A resposta gerada é retornada ao usuário.
 
 ## Configuração do Ambiente
 
@@ -104,7 +113,7 @@ Envie uma requisição `POST` para o endpoint `/chat`.
 curl -X POST http://localhost:8000/chat \
 -H "Content-Type: application/json" \
 -d 
-'{    "question": "Qual é o diâmetro do êmbolo do atuador DSNU-12-70-P-A?",    "session_id": "user123_session456"
+'{    "question": "Qual é o diâmetro do êmbolo do atuador DSNU?",    "session_id": "user123_session456"
 }'
 ```
 
@@ -112,20 +121,9 @@ curl -X POST http://localhost:8000/chat \
 
 ```json
 {
-  "answer": "O diâmetro do êmbolo do atuador DSNU-12-70-P-A é de 12 mm."
+  "answer": "O diâmetro do êmbolo do atuador DSNU pode variar. De acordo com a documentação, existem modelos com diâmetros de 8, 10, 12, 16, 20 e 25 mm."
 }
 ```
-
-## Como Contribuir
-
-Contribuições são bem-vindas! Siga os passos abaixo:
-
-1.  **Fork o repositório.**
-2.  **Crie uma branch:** `git checkout -b feature/sua-feature`.
-3.  **Faça suas alterações.**
-4.  **Faça o commit:** `git commit -m 'feat: Adiciona nova funcionalidade' `.
-5.  **Envie para o seu fork:** `git push origin feature/sua-feature`.
-6.  **Abra um Pull Request.**
 
 ## Licença
 

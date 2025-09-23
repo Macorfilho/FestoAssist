@@ -11,3 +11,4 @@ flask-cors
 redis
 langchain-redis
 gunicorn
+nltk

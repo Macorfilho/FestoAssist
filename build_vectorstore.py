@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 import google.generativeai as genai
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -7,7 +8,7 @@ from pathlib import Path
 from langchain_community.document_loaders import PyMuPDFLoader, UnstructuredMarkdownLoader
 import dotenv
 import nltk
-nltk.download('punkt_tab')
+nltk.download('punkt')
 
 
 # Carrega as variáveis de ambiente (necessário para a GOOGLE_API_KEY)
@@ -24,9 +25,25 @@ except KeyError:
     print("Erro: A variável de ambiente GOOGLE_API_KEY não foi definida.")
     exit()
 
+def _load_document(file_path):
+    """Carrega um único documento com base na sua extensão."""
+    try:
+        if file_path.suffix == ".pdf":
+            loader = PyMuPDFLoader(str(file_path))
+        elif file_path.suffix == ".md":
+            loader = UnstructuredMarkdownLoader(str(file_path))
+        else:
+            return None  # Ignora arquivos não suportados
+        
+        print(f"Carregando: {file_path.name}")
+        return loader.load()
+    except Exception as e:
+        print(f"Erro ao carregar {file_path.name}: {e}")
+        return None
+
 def load_documents_from_folders(paths):
     """
-    Carrega documentos PDF de uma lista de diretórios.
+    Carrega documentos PDF e Markdown de uma lista de diretórios.
     """
     all_docs = []
     for folder_path in paths:
@@ -35,14 +52,11 @@ def load_documents_from_folders(paths):
             print(f"Aviso: O diretório '{folder_path}' não foi encontrado.")
             continue
         
-        # Carrega arquivos PDF
-        for pdf_path in path.glob("*.pdf"):
-            try:
-                loader = PyMuPDFLoader(str(pdf_path))
-                all_docs.extend(loader.load())
-                print(f"Carregado: {pdf_path.name}")
-            except Exception as e:
-                print(f"Erro ao carregar {pdf_path.name}: {e}")
+        for file_path in path.glob("**/*"):  # Usar **/* para buscar em subdiretórios
+            if file_path.is_file():
+                docs = _load_document(file_path)
+                if docs:
+                    all_docs.extend(docs)
                 
     return all_docs
 
