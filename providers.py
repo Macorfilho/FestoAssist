@@ -42,7 +42,7 @@ class ModelProvider:
         if self._llm is None:
             print("Inicializando modelo de Chat (LLM)...")
             self._llm = ChatGoogleGenerativeAI(
-                model="gemini-2.5-pro",
+                model="gemini-2.5-flash",
                 temperature=0.2,
                 api_key=self.config.get_google_api_key()
             )
